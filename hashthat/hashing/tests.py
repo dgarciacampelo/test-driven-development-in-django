@@ -1,37 +1,44 @@
 from .forms import HashForm
 from .models import Hash
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from selenium import webdriver
+from selenium.webdriver.common.by import By
 import hashlib
+import time
 
 TEST_STRING = "hello"
 TEST_HASH = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
 
 
 class FunctionalTestCase(TestCase):
-    pass
-
-    """
     def setUp(self):
         # ? https://www.geeksforgeeks.org/how-to-install-selenium-in-python/
         self.browser = webdriver.Firefox()
 
-    def tearDown(self):
-        self.browser.quit()
-
     def test_there_is_homepage(self):
         self.browser.get("http://localhost:8000")
-        self.assertIn("install", self.browser.page_source)
+        self.assertIn("Enter hash here:", self.browser.page_source)
 
     def test_hash_of_hello(self):
-        string = TEST_STRING
-        hash = TEST_HASH
+        # ! Starting from Selenium 4, the method for finding elements has changed.
         self.browser.get("http://localhost:8000")
-        text = self.browser.find_element_by_id("text")
-        text.send_keys(string)
-        self.browser.find_element_by_name("submit").click()
-        self.assertIn(hash, self.browser.page_source)
-    """
+        # text = self.browser.find_element_by_id("id_text")
+        text = self.browser.find_element(By.ID, "id_text")
+        text.send_keys(TEST_STRING)
+        # self.browser.find_element_by_name("submit").click()
+        self.browser.find_element(By.NAME, "submit").click()
+        self.assertIn(TEST_HASH, self.browser.page_source)
+
+    def test_hash_ajax(self):
+        self.browser.get("http://localhost:8000")
+        text = self.browser.find_element(By.ID, "id_text")
+        text.send_keys(TEST_STRING)
+        time.sleep(1)  # wait for AJAX to complete
+        self.assertIn(TEST_HASH, self.browser.page_source)
+
+    def tearDown(self):
+        self.browser.quit()
 
 
 class UnitTestCase(TestCase):
@@ -63,3 +70,11 @@ class UnitTestCase(TestCase):
         hash = self.save_hash()
         response = self.client.get(f"/hash/{hash.hash}")
         self.assertContains(response, TEST_STRING)
+
+    def test_bad_data(self):
+        def bad_hash():
+            hash = Hash()
+            hash.hash = f"{TEST_HASH}bad_data"
+            hash.full_clean()
+
+        self.assertRaises(ValidationError, bad_hash)
