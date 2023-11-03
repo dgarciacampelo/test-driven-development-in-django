@@ -1,7 +1,11 @@
 from .forms import HashForm
+from .models import Hash
 from django.test import TestCase
 from selenium import webdriver
 import hashlib
+
+TEST_STRING = "hello"
+TEST_HASH = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
 
 
 class FunctionalTestCase(TestCase):
@@ -20,8 +24,8 @@ class FunctionalTestCase(TestCase):
         self.assertIn("install", self.browser.page_source)
 
     def test_hash_of_hello(self):
-        string = "hello"
-        hash = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        string = TEST_STRING
+        hash = TEST_HASH
         self.browser.get("http://localhost:8000")
         text = self.browser.find_element_by_id("text")
         text.send_keys(string)
@@ -36,10 +40,26 @@ class UnitTestCase(TestCase):
         self.assertTemplateUsed(response, "hashing/home.html")
 
     def test_hash_form(self):
-        form = HashForm(data={"text": "hello"})
+        form = HashForm(data={"text": TEST_STRING})
         self.assertTrue(form.is_valid())
 
-    def test_hash_func_works(self, text_to_hash="hello"):
-        check = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
-        text_hash = hashlib.sha256("hello".encode("utf-8")).hexdigest()
-        self.assertEqual(text_hash, check, "Hash function does not work")
+    def test_hash_func_works(self):
+        text_hash = hashlib.sha256(TEST_STRING.encode("utf-8")).hexdigest()
+        self.assertEqual(text_hash, TEST_HASH, "Hash function does not work")
+
+    def save_hash(self):
+        hash = Hash()
+        hash.text = TEST_STRING
+        hash.hash = TEST_HASH
+        hash.save()
+        return hash
+
+    def test_hash_object(self):
+        hash = self.save_hash()
+        pulled_hash = Hash.objects.get(hash=TEST_HASH)
+        self.assertEqual(hash.text, pulled_hash.text)
+
+    def test_viewing_hash(self):
+        hash = self.save_hash()
+        response = self.client.get(f"/hash/{hash.hash}")
+        self.assertContains(response, TEST_STRING)
